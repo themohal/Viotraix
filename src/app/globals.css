@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+:root {
+  --background: #050a09;
+  --foreground: #f0f5f3;
+  --card: #0a1512;
+  --card-hover: #0f1f1a;
+  --border: #152e25;
+  --border-hover: #1e4535;
+  --muted: #5e8a78;
+  --muted-foreground: #8fb8a6;
+  --accent: #10b981;
+  --accent-hover: #34d399;
+  --accent-foreground: #fff;
+  --accent2: #f59e0b;
+  --accent2-hover: #fbbf24;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #10b981;
+  --info: #38bdf8;
+  --glow: rgba(16, 185, 129, 0.15);
+  --glow2: rgba(245, 158, 11, 0.1);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent2: var(--accent2);
+  --color-accent2-hover: var(--accent2-hover);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-info: var(--info);
+  --color-glow: var(--glow);
+  --color-glow2: var(--glow2);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+@utility btn-primary {
+  background: linear-gradient(135deg, var(--accent) 0%, #059669 50%, var(--accent2) 100%);
+  color: #fff;
+  padding: 0.75rem 1.75rem;
+  border-radius: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: all 0.3s;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.3), 0 0 60px rgba(16, 185, 129, 0.1);
+  &:hover {
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.5), 0 0 80px rgba(16, 185, 129, 0.2);
+    transform: translateY(-1px);
+  }
+}
+
+@utility btn-secondary {
+  background-color: transparent;
+  color: var(--foreground);
+  padding: 0.75rem 1.75rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  transition: all 0.3s;
+  &:hover {
+    border-color: var(--accent);
+    background: rgba(16, 185, 129, 0.05);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+  }
+}
+
+@utility input-field {
+  width: 100%;
+  background-color: rgba(10, 21, 18, 0.8);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: all 0.3s;
+  backdrop-filter: blur(8px);
+  &:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1), 0 0 20px rgba(16, 185, 129, 0.05);
+  }
+  &::placeholder {
+    color: var(--muted);
+  }
+}
+
+@utility glass-card {
+  background: rgba(10, 21, 18, 0.6);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(2deg); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
