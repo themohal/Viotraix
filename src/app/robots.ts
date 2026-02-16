@@ -11,6 +11,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/api/", "/dashboard/", "/new-audit/", "/audits/", "/settings/", "/billing/", "/usage/"],
       },
     ],
-    sitemap: `${baseUrl}/sitemap.xml`,
+    sitemap: "https://viotraix.vercel.app/sitemap.xml",
   };
 }
