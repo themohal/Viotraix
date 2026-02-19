@@ -332,8 +332,13 @@ export default function UploadZone({ plan = "none", remainingAudits }: UploadZon
           type: "image/jpeg",
         });
 
-        stopCamera();
-        processFile(file);
+        if (isPro) {
+          // Stage the photo and keep camera open for more captures
+          addFilesToStaging([file]);
+        } else {
+          stopCamera();
+          processFile(file);
+        }
       },
       "image/jpeg",
       0.9
@@ -343,7 +348,13 @@ export default function UploadZone({ plan = "none", remainingAudits }: UploadZon
   // Handle camera capture input (mobile fallback)
   const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) processFile(file);
+    if (!file) return;
+
+    if (isPro) {
+      addFilesToStaging([file]);
+    } else {
+      processFile(file);
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -422,6 +433,15 @@ export default function UploadZone({ plan = "none", remainingAudits }: UploadZon
               className="w-full"
             />
 
+            {/* Pro: photo counter at top */}
+            {isPro && (
+              <div className="absolute inset-x-0 top-0 flex items-center justify-center bg-gradient-to-b from-black/60 to-transparent p-3">
+                <span className="rounded-full bg-black/50 px-3 py-1 text-sm font-medium text-white backdrop-blur-sm">
+                  {stagedFiles.length} / {MAX_BULK_FILES} photos
+                </span>
+              </div>
+            )}
+
             {/* Camera controls overlay */}
             <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-4 bg-gradient-to-t from-black/80 to-transparent p-4 pt-10">
               {/* Switch camera */}
@@ -435,25 +455,36 @@ export default function UploadZone({ plan = "none", remainingAudits }: UploadZon
                 </svg>
               </button>
 
-              {/* Capture button */}
+              {/* Capture button — disabled at max */}
               <button
                 onClick={capturePhoto}
-                className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white bg-white/20 transition hover:bg-white/40"
-                title="Take photo"
+                disabled={isPro && stagedFiles.length >= MAX_BULK_FILES}
+                className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white bg-white/20 transition hover:bg-white/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                title={isPro && stagedFiles.length >= MAX_BULK_FILES ? "Maximum photos reached" : "Take photo"}
               >
                 <div className="h-12 w-12 rounded-full bg-white" />
               </button>
 
-              {/* Cancel */}
-              <button
-                onClick={stopCamera}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition hover:bg-white/30"
-                title="Cancel"
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              {/* Pro with staged photos: Done button. Otherwise: Cancel (X) */}
+              {isPro && stagedFiles.length > 0 ? (
+                <button
+                  onClick={stopCamera}
+                  className="flex h-10 items-center justify-center rounded-full bg-accent px-4 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-accent/80"
+                  title="Done capturing"
+                >
+                  Done
+                </button>
+              ) : (
+                <button
+                  onClick={stopCamera}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition hover:bg-white/30"
+                  title="Cancel"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
         </div>
