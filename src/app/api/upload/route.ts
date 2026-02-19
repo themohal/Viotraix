@@ -101,6 +101,7 @@ export async function POST(request: Request) {
       .single();
 
     if (insertError) {
+      console.error("Audit insert error:", insertError);
       return NextResponse.json(
         { error: "Failed to create audit record" },
         { status: 500 }
