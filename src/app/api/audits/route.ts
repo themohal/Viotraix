@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from("audits")
-      .select("id, file_name, industry_type, status, overall_score, violations_count, created_at", {
+      .select("id, file_name, audit_name, image_count, industry_type, status, overall_score, violations_count, created_at", {
         count: "exact",
       })
       .eq("user_id", auth.user.id)
