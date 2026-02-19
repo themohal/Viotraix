@@ -29,7 +29,7 @@ function LoginForm() {
 
     try {
       const supabase = getSupabaseBrowser();
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -37,6 +37,19 @@ function LoginForm() {
       if (error) {
         setError(error.message);
         return;
+      }
+
+      // Sync session to cookies for server-side auth
+      if (data.session) {
+        await fetch("/api/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+            expires_in: data.session.expires_in,
+          }),
+        });
       }
 
       const redirectTo = redirectParam && REDIRECT_MAP[redirectParam]

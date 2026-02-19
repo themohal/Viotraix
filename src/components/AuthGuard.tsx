@@ -18,6 +18,16 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       if (!result.data.session) {
         router.replace("/login");
       } else {
+        // Sync session to cookies for server-side auth
+        await fetch("/api/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            access_token: result.data.session.access_token,
+            refresh_token: result.data.session.refresh_token,
+            expires_in: result.data.session.expires_in,
+          }),
+        });
         setAuthenticated(true);
       }
       setLoading(false);
