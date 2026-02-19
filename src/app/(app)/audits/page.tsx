@@ -20,6 +20,7 @@ export default function AuditsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
   const [industryFilter, setIndustryFilter] = useState("");
+  const [session, setSession] = useState<{ access_token: string } | null>(null);
 
   useEffect(() => {
     const fetchAudits = async () => {
@@ -30,6 +31,7 @@ export default function AuditsPage() {
       } = await supabase.auth.getSession();
 
       if (!session) return;
+      setSession(session);
 
       const params = new URLSearchParams();
       if (statusFilter) params.set("status", statusFilter);
@@ -49,6 +51,19 @@ export default function AuditsPage() {
 
     fetchAudits();
   }, [statusFilter, industryFilter]);
+
+  const handleDelete = async (auditId: string) => {
+    if (!session || !confirm("Delete this audit? This cannot be undone.")) return;
+
+    const res = await fetch(`/api/audits/${auditId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+
+    if (res.ok) {
+      setAudits((prev) => prev.filter((a) => a.id !== auditId));
+    }
+  };
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -109,6 +124,7 @@ export default function AuditsPage() {
               overallScore={audit.overall_score}
               violationsCount={audit.violations_count}
               createdAt={audit.created_at}
+              onDelete={handleDelete}
             />
           ))}
         </div>

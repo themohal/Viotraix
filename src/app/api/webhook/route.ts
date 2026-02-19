@@ -145,13 +145,56 @@ export async function POST(request: Request) {
       }
 
       case "order_created": {
-        // One-time purchase
-        await supabase.from("one_time_purchases").insert({
-          user_id: userId,
-          ls_order_id: String(payload.data?.id),
-          audits_purchased: 1,
-          audits_remaining: 1,
-        });
+        const tier = customData?.tier;
+        const orderVariantId = String(
+          attributes?.first_order_item?.variant_id
+        );
+
+        // Determine if this is a subscription plan or single purchase
+        const isBasic =
+          tier === "basic" ||
+          orderVariantId === process.env.NEXT_PUBLIC_LEMONSQUEEZY_VARIANT_ID_BASIC;
+        const isPro =
+          tier === "pro" ||
+          orderVariantId === process.env.NEXT_PUBLIC_LEMONSQUEEZY_VARIANT_ID_PRO;
+
+        if (isBasic || isPro) {
+          // Subscription plan purchase
+          const plan = isPro ? "pro" : "basic";
+          const limit = isPro ? 200 : 50;
+          const now = new Date();
+          const periodEnd = new Date(
+            now.getTime() + 30 * 24 * 60 * 60 * 1000
+          );
+
+          await supabase
+            .from("profiles")
+            .update({
+              plan,
+              ls_customer_id: String(attributes?.customer_id),
+              subscription_status: "active",
+              current_period_start: now.toISOString(),
+              current_period_end: periodEnd.toISOString(),
+              updated_at: now.toISOString(),
+            })
+            .eq("id", userId);
+
+          await supabase.from("usage_tracking").insert({
+            user_id: userId,
+            period_start: now.toISOString(),
+            period_end: periodEnd.toISOString(),
+            audits_used: 0,
+            audits_limit: limit,
+          });
+        } else {
+          // Single audit purchase
+          await supabase.from("one_time_purchases").insert({
+            user_id: userId,
+            ls_order_id: String(payload.data?.id),
+            audits_purchased: 1,
+            audits_remaining: 1,
+          });
+        }
         break;
       }
     }

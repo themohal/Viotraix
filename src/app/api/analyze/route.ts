@@ -62,13 +62,13 @@ export async function POST(request: Request) {
 
       return NextResponse.json({ success: true, result });
     } catch (analysisError) {
-      // Mark as failed
+      // Mark as failed — log internally but don't expose raw error to user
+      console.error("Analysis failed for audit", auditId, analysisError);
       await supabase
         .from("audits")
         .update({
           status: "failed",
-          processing_error:
-            analysisError instanceof Error ? analysisError.message : "Analysis failed",
+          processing_error: "Something went wrong while analyzing your image. Please try again.",
           updated_at: new Date().toISOString(),
         })
         .eq("id", auditId);
