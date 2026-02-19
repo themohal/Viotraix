@@ -35,6 +35,7 @@ interface Audit {
   result_json: AuditResult | null;
   image_url: string;
   processing_error: string | null;
+  pdf_eligible: boolean;
   created_at: string;
 }
 
@@ -108,9 +109,36 @@ export default function AuditDetailPage() {
   }, [id]);
 
   const isProPlan = userPlan === "pro";
+  const [downloading, setDownloading] = useState(false);
 
-  const handlePrint = () => {
-    window.print();
+  const handleDownloadPdf = async () => {
+    if (!audit) return;
+    setDownloading(true);
+    try {
+      const supabase = getSupabaseBrowser();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`/api/audits/${audit.id}/pdf`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || "Failed to generate PDF");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `viotraix-audit-${audit.file_name.replace(/[^a-zA-Z0-9._-]/g, "_")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
   };
 
   if (loading) {
@@ -152,12 +180,16 @@ export default function AuditDetailPage() {
           {audit.status === "completed" && audit.overall_score !== null && (
             <ScoreBadge score={audit.overall_score} />
           )}
-          {audit.status === "completed" && isProPlan && (
-            <button onClick={handlePrint} className="btn-secondary text-sm">
-              Print / PDF
+          {audit.status === "completed" && audit.pdf_eligible && (
+            <button
+              onClick={handleDownloadPdf}
+              disabled={downloading}
+              className="btn-secondary text-sm"
+            >
+              {downloading ? "Generating..." : "Download PDF"}
             </button>
           )}
-          {audit.status === "completed" && !isProPlan && (
+          {audit.status === "completed" && !audit.pdf_eligible && (
             <a href="/pricing" className="rounded-xl border border-border/60 px-3 py-2 text-xs text-muted-foreground hover:border-accent/50 transition">
               Upgrade to Pro for PDF
             </a>

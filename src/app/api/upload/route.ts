@@ -83,6 +83,7 @@ export async function POST(request: Request) {
         file_name: file.name,
         industry_type: industry,
         status: "pending",
+        pdf_eligible: usage.plan === "pro",
       })
       .select("id")
       .single();

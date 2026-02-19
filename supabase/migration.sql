@@ -35,6 +35,7 @@ create table if not exists public.audits (
   violations_count integer default 0,
   result_json jsonb,
   processing_error text,
+  pdf_eligible boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -205,3 +206,10 @@ create policy "Service role full access on audit images"
     bucket_id = 'audit-images'
     and auth.role() = 'service_role'
   );
+
+-- ============================================================
+-- 7. MIGRATIONS FOR EXISTING DATABASES
+-- ============================================================
+
+-- Add pdf_eligible column to audits (safe to run on existing DB)
+alter table public.audits add column if not exists pdf_eligible boolean not null default false;
