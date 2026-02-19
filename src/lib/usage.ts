@@ -1,4 +1,5 @@
 import { getServiceSupabase } from "./supabase";
+import { isAdmin } from "./admin";
 
 const PLAN_LIMITS: Record<string, number> = {
   basic: 50,
@@ -6,6 +7,18 @@ const PLAN_LIMITS: Record<string, number> = {
 };
 
 export async function getUserUsage(userId: string) {
+  // Admin always gets Pro with unlimited audits
+  if (await isAdmin(userId)) {
+    return {
+      canAudit: true,
+      auditsUsed: 0,
+      auditsLimit: 200,
+      plan: "pro",
+      expired: false,
+      expiredAt: null,
+    };
+  }
+
   const supabase = getServiceSupabase();
 
   // Get user profile
@@ -134,6 +147,9 @@ export async function getUserUsage(userId: string) {
 }
 
 export async function incrementUsage(userId: string) {
+  // Skip usage tracking for admin
+  if (await isAdmin(userId)) return;
+
   const supabase = getServiceSupabase();
 
   // Try increment subscription usage

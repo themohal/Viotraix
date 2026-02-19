@@ -73,7 +73,11 @@ export default function BillingPage() {
     pro: "Pro ($79/mo)",
   };
 
-  const currentPlanLabel = planLabel[profile?.plan || ""] || "No active plan";
+  // Use usage.plan as source of truth (handles admin bypass + actual usage state)
+  const effectivePlan = usage?.plan || profile?.plan || "none";
+  const currentPlanLabel = planLabel[effectivePlan] || "No active plan";
+
+  const isActive = usage?.canAudit || profile?.subscription_status === "active";
 
   const periodEnd = profile?.current_period_end
     ? new Date(profile.current_period_end).toLocaleDateString("en-US", {
@@ -105,7 +109,7 @@ export default function BillingPage() {
               className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
                 usage?.expired
                   ? "border-amber-500/20 bg-amber-500/10 text-amber-400"
-                  : profile?.subscription_status === "active"
+                  : isActive
                   ? "border-success/20 bg-success/10 text-success"
                   : profile?.subscription_status === "cancelled"
                   ? "border-amber-500/20 bg-amber-500/10 text-amber-400"
@@ -114,7 +118,7 @@ export default function BillingPage() {
             >
               {usage?.expired
                 ? "Expired"
-                : profile?.subscription_status === "active"
+                : isActive
                 ? "Active"
                 : profile?.subscription_status === "cancelled"
                 ? "Cancelled"
@@ -137,7 +141,7 @@ export default function BillingPage() {
             </div>
           )}
 
-          {(usage?.expired || !profile?.plan || profile.plan === "none" || profile.plan === "free") && (
+          {(usage?.expired || effectivePlan === "none" || effectivePlan === "free") && (
             <a
               href="/pricing"
               className="btn-primary mt-2 inline-block text-sm"
