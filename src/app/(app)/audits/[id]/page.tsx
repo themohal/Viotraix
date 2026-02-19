@@ -189,7 +189,7 @@ export default function AuditDetailPage() {
               {downloading ? "Generating..." : "Download PDF"}
             </button>
           )}
-          {audit.status === "completed" && !audit.pdf_eligible && (
+          {audit.status === "completed" && !audit.pdf_eligible && !isProPlan && (
             <a href="/pricing" className="rounded-xl border border-border/60 px-3 py-2 text-xs text-muted-foreground hover:border-accent/50 transition">
               Upgrade to Pro for PDF
             </a>
