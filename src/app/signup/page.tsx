@@ -18,6 +18,7 @@ function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -26,6 +27,7 @@ function SignupForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
     setLoading(true);
 
     try {
@@ -35,6 +37,7 @@ function SignupForm() {
         password,
         options: {
           data: { full_name: fullName },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
@@ -43,7 +46,13 @@ function SignupForm() {
         return;
       }
 
-      // Sync session to cookies for server-side auth (if session returned immediately)
+      // Supabase returns a user with no session and a fake identity when email already exists
+      if (data.user && data.user.identities && data.user.identities.length === 0) {
+        setError("An account with this email already exists. Please log in instead.");
+        return;
+      }
+
+      // If session returned immediately (email confirmation disabled)
       if (data.session) {
         await fetch("/api/auth/session", {
           method: "POST",
@@ -54,13 +63,17 @@ function SignupForm() {
             expires_in: data.session.expires_in,
           }),
         });
+
+        const redirectTo = redirectParam && REDIRECT_MAP[redirectParam]
+          ? REDIRECT_MAP[redirectParam]
+          : "/dashboard";
+        router.push(redirectTo);
+        router.refresh();
+        return;
       }
 
-      const redirectTo = redirectParam && REDIRECT_MAP[redirectParam]
-        ? REDIRECT_MAP[redirectParam]
-        : "/dashboard";
-      router.push(redirectTo);
-      router.refresh();
+      // Email confirmation required
+      setSuccess("Account created! A confirmation email has been sent. Please check your inbox or spam folder.");
     } catch {
       setError("An unexpected error occurred");
     } finally {
@@ -100,7 +113,13 @@ function SignupForm() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            {success && (
+              <div className="mb-4 rounded-xl bg-success/10 border border-success/20 p-4 text-sm text-success">
+                <p className="font-medium">{success}</p>
+              </div>
+            )}
+
+            {success ? null : <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="name" className="mb-1.5 block text-sm font-medium">
                   Full Name
@@ -155,7 +174,7 @@ function SignupForm() {
                 {loading && <LoadingSpinner size="sm" />}
                 Create Account
               </button>
-            </form>
+            </form>}
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Already have an account?{" "}
