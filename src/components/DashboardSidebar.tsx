@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase";
 
 const navItems = [
@@ -65,14 +65,12 @@ const navItems = [
 
 export default function DashboardSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
 
   const handleLogout = async () => {
     const supabase = getSupabaseBrowser();
     await supabase.auth.signOut();
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/");
-    router.refresh();
+    window.location.href = "/";
   };
 
   return (

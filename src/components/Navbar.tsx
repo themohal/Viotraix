@@ -1,13 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase";
 
 export default function Navbar() {
   const [user, setUser] = useState<{ email?: string } | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     const supabase = getSupabaseBrowser();
@@ -27,8 +25,7 @@ export default function Navbar() {
     const supabase = getSupabaseBrowser();
     await supabase.auth.signOut();
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/");
-    router.refresh();
+    window.location.href = "/";
   };
 
   return (
