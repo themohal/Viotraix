@@ -34,7 +34,6 @@ const tiers = [
       "Audit history & search",
       "All violation categories",
       "Fix recommendations",
-      "Email support",
     ],
     cta: "Get Basic",
     variant: "basic",
