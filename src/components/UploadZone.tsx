@@ -137,20 +137,8 @@ export default function UploadZone({ plan = "none", remainingAudits }: UploadZon
 
   const addFilesToStaging = (newFiles: File[]) => {
     setError("");
-    const currentCount = stagedFiles.length;
-    const available = MAX_BULK_FILES - currentCount;
 
-    if (available <= 0) {
-      setError(`Maximum ${MAX_BULK_FILES} images per bulk upload.`);
-      return;
-    }
-
-    const filesToAdd = newFiles.slice(0, available);
-    if (newFiles.length > available) {
-      setError(`Only ${available} more image${available === 1 ? "" : "s"} can be added (max ${MAX_BULK_FILES}).`);
-    }
-
-    for (const file of filesToAdd) {
+    for (const file of newFiles) {
       const err = validateFile(file);
       if (err) {
         setError(`${file.name}: ${err}`);
@@ -158,12 +146,26 @@ export default function UploadZone({ plan = "none", remainingAudits }: UploadZon
       }
     }
 
-    const staged = filesToAdd.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-    }));
+    setStagedFiles((prev) => {
+      const available = MAX_BULK_FILES - prev.length;
 
-    setStagedFiles((prev) => [...prev, ...staged]);
+      if (available <= 0) {
+        setError(`Maximum ${MAX_BULK_FILES} images per bulk upload.`);
+        return prev;
+      }
+
+      const filesToAdd = newFiles.slice(0, available);
+      if (newFiles.length > available) {
+        setError(`Only ${available} more image${available === 1 ? "" : "s"} can be added (max ${MAX_BULK_FILES}).`);
+      }
+
+      const staged = filesToAdd.map((file) => ({
+        file,
+        preview: URL.createObjectURL(file),
+      }));
+
+      return [...prev, ...staged];
+    });
   };
 
   const removeStagedFile = (index: number) => {
