@@ -193,12 +193,22 @@ export async function GET(
     y += 4;
     const score = result.overall_score;
     const scoreColor = getScoreColor(score);
-    doc.setFillColor(...scoreColor);
-    doc.roundedRect(margin, y, 90, 32, 6, 6, "F");
+    const scoreText = `Score: ${score}/100`;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
+    const scoreBadgeWidth = doc.getTextWidth(scoreText) + 24;
+
+    // Green shadow/glow behind badge
+    doc.setFillColor(scoreColor[0], scoreColor[1], scoreColor[2]);
+    doc.setGState(doc.GState({ opacity: 0.18 }));
+    doc.roundedRect(margin - 3, y - 3, scoreBadgeWidth + 6, 38, 9, 9, "F");
+    doc.setGState(doc.GState({ opacity: 1 }));
+
+    // Badge fill
+    doc.setFillColor(...scoreColor);
+    doc.roundedRect(margin, y, scoreBadgeWidth, 32, 6, 6, "F");
     doc.setTextColor(255, 255, 255);
-    doc.text(`Score: ${score}/100`, margin + 10, y + 22);
+    doc.text(scoreText, margin + 12, y + 22);
     y += 48;
 
     // ── Summary ─────────────────────────────────────────────
