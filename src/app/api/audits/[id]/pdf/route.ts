@@ -33,14 +33,24 @@ interface AuditRow {
   created_at: string;
 }
 
-// Colors
-const BRAND_ACCENT = [99, 102, 241] as const; // indigo-500
-const BRAND_ACCENT2 = [168, 85, 247] as const; // purple-500
+// ── Design tokens ───────────────────────────────────────────
+const BRAND_ACCENT = [99, 102, 241] as const;
+const BRAND_ACCENT2 = [168, 85, 247] as const;
 const COLOR_DANGER = [239, 68, 68] as const;
 const COLOR_WARNING = [245, 158, 11] as const;
 const COLOR_SUCCESS = [34, 197, 94] as const;
-const COLOR_MUTED = [115, 115, 130] as const;
-const COLOR_DARK = [15, 15, 25] as const;
+const COLOR_MUTED = [120, 120, 138] as const;
+const COLOR_DARK = [20, 20, 35] as const;
+const COLOR_LIGHT_BG = [247, 247, 250] as const;
+const COLOR_CARD_BORDER = [230, 230, 238] as const;
+
+// Spacing constants
+const LINE_SM = 15;        // small body text line height
+const LINE_MD = 17;        // body text line height
+const LINE_LG = 20;        // larger text line height
+const SECTION_GAP = 28;    // gap between major sections
+const INNER_PAD = 14;      // padding inside cards
+const CARD_RADIUS = 8;
 
 function getScoreColor(score: number): readonly [number, number, number] {
   if (score >= 80) return COLOR_SUCCESS;
@@ -65,39 +75,67 @@ function getSeverityColor(severity: string): readonly [number, number, number] {
 
 function drawShieldLogo(doc: jsPDF, x: number, y: number, size: number) {
   const s = size / 24;
-  // Shield body
   doc.setFillColor(...BRAND_ACCENT);
   doc.roundedRect(x, y, 18 * s, 22 * s, 3 * s, 3 * s, "F");
-  // Shield bottom triangle
   doc.setFillColor(...BRAND_ACCENT);
-  doc.triangle(
-    x, y + 16 * s,
-    x + 18 * s, y + 16 * s,
-    x + 9 * s, y + 24 * s,
-    "F"
-  );
-  // Inner accent stripe
+  doc.triangle(x, y + 16 * s, x + 18 * s, y + 16 * s, x + 9 * s, y + 24 * s, "F");
   doc.setFillColor(...BRAND_ACCENT2);
   doc.roundedRect(x + 3 * s, y + 3 * s, 12 * s, 14 * s, 2 * s, 2 * s, "F");
-  // Checkmark
   doc.setDrawColor(255, 255, 255);
   doc.setLineWidth(2 * s);
   doc.line(x + 5.5 * s, y + 10 * s, x + 8 * s, y + 13 * s);
   doc.line(x + 8 * s, y + 13 * s, x + 13 * s, y + 6 * s);
 }
 
-/** Wrap text to maxWidth, returning array of lines */
-function wrapText(doc: jsPDF, text: string, maxWidth: number): string[] {
+function wrap(doc: jsPDF, text: string, maxWidth: number): string[] {
   return doc.splitTextToSize(text, maxWidth) as string[];
 }
 
-/** Add a new page and return the reset Y position */
-function checkPageBreak(doc: jsPDF, y: number, needed: number, margin: number): number {
-  if (y + needed > doc.internal.pageSize.getHeight() - margin) {
+function pageBreak(doc: jsPDF, y: number, needed: number, margin: number): number {
+  const footerReserve = 48;
+  if (y + needed > doc.internal.pageSize.getHeight() - margin - footerReserve) {
     doc.addPage();
     return margin;
   }
   return y;
+}
+
+/** Draw a subtle card background */
+function drawCard(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fillColor?: readonly [number, number, number],
+  borderColor?: readonly [number, number, number],
+) {
+  doc.setFillColor(...(fillColor || COLOR_LIGHT_BG));
+  doc.roundedRect(x, y, w, h, CARD_RADIUS, CARD_RADIUS, "F");
+  if (borderColor) {
+    doc.setDrawColor(...borderColor);
+    doc.setLineWidth(0.75);
+    doc.roundedRect(x, y, w, h, CARD_RADIUS, CARD_RADIUS, "S");
+  }
+}
+
+/** Draw a section heading with a small accent bar */
+function drawSectionHeading(
+  doc: jsPDF,
+  text: string,
+  x: number,
+  y: number,
+  color: readonly [number, number, number],
+): number {
+  // Accent bar
+  doc.setFillColor(...color);
+  doc.roundedRect(x, y - 10, 3, 16, 1.5, 1.5, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(...color);
+  doc.text(text, x + 12, y);
+  return y + LINE_LG + 4;
 }
 
 export async function GET(
@@ -143,30 +181,39 @@ export async function GET(
     const result = a.result_json;
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 48;
+    const margin = 50;
     const contentWidth = pageWidth - margin * 2;
     let y = margin;
 
-    // ── Header ──────────────────────────────────────────────
-    drawShieldLogo(doc, margin, y, 28);
+    // =============================================================
+    //  HEADER
+    // =============================================================
+    drawShieldLogo(doc, margin, y, 32);
+
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
+    doc.setFontSize(24);
     doc.setTextColor(...COLOR_DARK);
-    doc.text("Viotraix", margin + 36, y + 20);
+    doc.text("Viotraix", margin + 42, y + 22);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(...COLOR_MUTED);
-    doc.text("AI Workplace Safety Audit Report", margin + 36, y + 34);
+    doc.text("AI Workplace Safety Audit Report", margin + 42, y + 38);
 
-    // Horizontal rule
-    y += 52;
+    // Gradient-style accent line (two overlapping colored lines)
+    y += 58;
     doc.setDrawColor(...BRAND_ACCENT);
-    doc.setLineWidth(2);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 20;
+    doc.setLineWidth(2.5);
+    doc.line(margin, y, margin + contentWidth * 0.6, y);
+    doc.setDrawColor(...BRAND_ACCENT2);
+    doc.setLineWidth(2.5);
+    doc.line(margin + contentWidth * 0.6, y, pageWidth - margin, y);
 
-    // ── Audit Info ──────────────────────────────────────────
+    y += SECTION_GAP;
+
+    // =============================================================
+    //  AUDIT INFO + SCORE  (side-by-side card)
+    // =============================================================
     const date = new Date(a.created_at).toLocaleDateString("en-US", {
       month: "long",
       day: "numeric",
@@ -175,248 +222,306 @@ export async function GET(
       minute: "2-digit",
     });
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(...COLOR_MUTED);
-
-    const infoLines = [
-      `File: ${a.file_name}`,
-      `Industry: ${result.industry_detected || a.industry_type}`,
-      `Date: ${date}`,
-    ];
-    infoLines.forEach((line) => {
-      doc.text(line, margin, y);
-      y += 16;
-    });
-
-    // Score badge
-    y += 4;
     const score = result.overall_score;
     const scoreColor = getScoreColor(score);
-    const scoreText = `Score: ${score}/100`;
+    const infoCardH = 82;
+
+    drawCard(doc, margin, y, contentWidth, infoCardH, COLOR_LIGHT_BG, COLOR_CARD_BORDER);
+
+    // Left side — meta info
+    const infoX = margin + INNER_PAD + 2;
+    let infoY = y + INNER_PAD + 12;
+
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    const scoreBadgeWidth = doc.getTextWidth(scoreText) + 24;
-
-    // Green shadow/glow behind badge
-    doc.setFillColor(scoreColor[0], scoreColor[1], scoreColor[2]);
-    doc.setGState(doc.GState({ opacity: 0.18 }));
-    doc.roundedRect(margin - 3, y - 3, scoreBadgeWidth + 6, 38, 9, 9, "F");
-    doc.setGState(doc.GState({ opacity: 1 }));
-
-    // Badge fill
-    doc.setFillColor(...scoreColor);
-    doc.roundedRect(margin, y, scoreBadgeWidth, 32, 6, 6, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.text(scoreText, margin + 12, y + 22);
-    y += 48;
-
-    // ── Summary ─────────────────────────────────────────────
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(...COLOR_DARK);
-    doc.text("Summary", margin, y);
-    y += 18;
+    doc.setFontSize(9);
+    doc.setTextColor(...COLOR_MUTED);
+    doc.text("FILE", infoX, infoY);
+    doc.text("INDUSTRY", infoX + 190, infoY);
+    doc.text("DATE", infoX + 340, infoY);
+    infoY += 14;
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.setTextColor(...COLOR_MUTED);
-    const summaryLines = wrapText(doc, result.summary, contentWidth);
-    summaryLines.forEach((line: string) => {
-      y = checkPageBreak(doc, y, 14, margin);
-      doc.text(line, margin, y);
-      y += 14;
-    });
-    y += 12;
+    doc.setTextColor(...COLOR_DARK);
+    // Truncate file name if too long
+    const displayName = a.file_name.length > 26 ? a.file_name.slice(0, 24) + "..." : a.file_name;
+    doc.text(displayName, infoX, infoY);
+    const industry = result.industry_detected || a.industry_type;
+    doc.text(industry.charAt(0).toUpperCase() + industry.slice(1), infoX + 190, infoY);
+    doc.text(date, infoX + 340, infoY);
 
-    // ── Priority Fixes ──────────────────────────────────────
+    // Score badge (right-aligned inside card)
+    const scoreText = `${score} / 100`;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    const stw = doc.getTextWidth(scoreText);
+    const badgeW = stw + 28;
+    const badgeX = margin + contentWidth - INNER_PAD - badgeW;
+    const badgeY = y + infoCardH - INNER_PAD - 30;
+
+    // Glow
+    doc.setFillColor(...scoreColor);
+    doc.setGState(doc.GState({ opacity: 0.15 }));
+    doc.roundedRect(badgeX - 4, badgeY - 4, badgeW + 8, 34 + 8, 10, 10, "F");
+    doc.setGState(doc.GState({ opacity: 1 }));
+
+    // Badge
+    doc.setFillColor(...scoreColor);
+    doc.roundedRect(badgeX, badgeY, badgeW, 34, 6, 6, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.text(scoreText, badgeX + 14, badgeY + 24);
+
+    y += infoCardH + SECTION_GAP;
+
+    // =============================================================
+    //  SUMMARY
+    // =============================================================
+    y = pageBreak(doc, y, 80, margin);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10.5);
+    doc.setTextColor(...COLOR_MUTED);
+    const summaryLines = wrap(doc, result.summary, contentWidth - INNER_PAD * 2);
+    const summaryCardH = INNER_PAD * 2 + 18 + summaryLines.length * LINE_MD + 4;
+
+    drawCard(doc, margin, y, contentWidth, summaryCardH, COLOR_LIGHT_BG, COLOR_CARD_BORDER);
+
+    // Section title inside card
+    let sy = y + INNER_PAD + 12;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(...COLOR_DARK);
+    doc.text("Summary", margin + INNER_PAD, sy);
+    sy += LINE_LG + 2;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10.5);
+    doc.setTextColor(...COLOR_MUTED);
+    summaryLines.forEach((line: string) => {
+      doc.text(line, margin + INNER_PAD, sy);
+      sy += LINE_MD;
+    });
+
+    y += summaryCardH + SECTION_GAP;
+
+    // =============================================================
+    //  PRIORITY FIXES
+    // =============================================================
     if (result.priority_fixes.length > 0) {
-      y = checkPageBreak(doc, y, 30, margin);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.setTextColor(...BRAND_ACCENT);
-      doc.text("Priority Fixes", margin, y);
-      y += 18;
+      y = pageBreak(doc, y, 60, margin);
+      y = drawSectionHeading(doc, "Priority Fixes", margin, y, BRAND_ACCENT);
 
       result.priority_fixes.forEach((fix, i) => {
-        y = checkPageBreak(doc, y, 30, margin);
+        y = pageBreak(doc, y, 36, margin);
 
-        // Number circle
+        // Numbered circle
         doc.setFillColor(...BRAND_ACCENT);
-        doc.circle(margin + 8, y - 3, 8, "F");
+        doc.circle(margin + 10, y - 3, 9, "F");
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
+        doc.setFontSize(10);
         doc.setTextColor(255, 255, 255);
-        doc.text(String(i + 1), margin + 8, y, { align: "center" });
+        doc.text(String(i + 1), margin + 10, y + 1, { align: "center" });
 
         // Fix text
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
+        doc.setFontSize(10.5);
         doc.setTextColor(...COLOR_DARK);
-        const fixLines = wrapText(doc, fix, contentWidth - 28);
+        const fixLines = wrap(doc, fix, contentWidth - 32);
         fixLines.forEach((line: string, li: number) => {
-          if (li > 0) y = checkPageBreak(doc, y, 14, margin);
-          doc.text(line, margin + 22, y);
-          y += 14;
+          if (li > 0) {
+            y += LINE_MD;
+            y = pageBreak(doc, y, LINE_MD, margin);
+          }
+          doc.text(line, margin + 28, y);
         });
-        y += 4;
+        y += LINE_MD + 6;
       });
-      y += 8;
+
+      y += SECTION_GAP - 6;
     }
 
-    // ── Violations ──────────────────────────────────────────
+    // =============================================================
+    //  VIOLATIONS
+    // =============================================================
     if (result.violations.length > 0) {
-      y = checkPageBreak(doc, y, 30, margin);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.setTextColor(...COLOR_DARK);
-      doc.text(`Violations (${result.violations.length})`, margin, y);
-      y += 20;
+      y = pageBreak(doc, y, 60, margin);
+      y = drawSectionHeading(doc, `Violations (${result.violations.length})`, margin, y, COLOR_DARK);
 
-      result.violations.forEach((v) => {
-        // Estimate height needed for this violation
-        y = checkPageBreak(doc, y, 100, margin);
+      result.violations.forEach((v, vi) => {
+        y = pageBreak(doc, y, 110, margin);
 
-        // Severity badge
+        // ── Violation header row: severity badge + category + title ──
         const sevColor = getSeverityColor(v.severity);
         const sevText = v.severity.toUpperCase();
-        doc.setFillColor(...sevColor);
-        const sevWidth = doc.getTextWidth(sevText) * 1.2 + 16;
-        doc.roundedRect(margin, y, sevWidth, 18, 4, 4, "F");
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
-        doc.setTextColor(255, 255, 255);
-        doc.text(sevText, margin + 8, y + 12);
+        const sevTextW = doc.getTextWidth(sevText);
+        const sevBadgeW = sevTextW + 14;
 
-        // Category
+        doc.setFillColor(...sevColor);
+        doc.roundedRect(margin, y - 11, sevBadgeW, 17, 4, 4, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.text(sevText, margin + 7, y);
+
+        // Category pill
+        const catText = v.category.replace(/_/g, " ").toUpperCase();
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
+        doc.setFontSize(7.5);
+        const catTextW = doc.getTextWidth(catText);
+        const catX = margin + sevBadgeW + 8;
+        doc.setFillColor(235, 235, 242);
+        doc.roundedRect(catX, y - 10, catTextW + 10, 15, 3, 3, "F");
         doc.setTextColor(...COLOR_MUTED);
-        doc.text(v.category, margin + sevWidth + 8, y + 12);
-        y += 26;
+        doc.text(catText, catX + 5, y);
+
+        y += LINE_SM + 2;
 
         // Title
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
+        doc.setFontSize(11.5);
         doc.setTextColor(...COLOR_DARK);
-        const titleLines = wrapText(doc, v.title, contentWidth);
+        const titleLines = wrap(doc, v.title, contentWidth);
         titleLines.forEach((line: string) => {
-          y = checkPageBreak(doc, y, 14, margin);
+          y = pageBreak(doc, y, LINE_LG, margin);
           doc.text(line, margin, y);
-          y += 14;
+          y += LINE_LG;
         });
-        y += 2;
+        y += 4;
 
         // Description
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
+        doc.setFontSize(10);
         doc.setTextColor(...COLOR_MUTED);
-        const descLines = wrapText(doc, v.description, contentWidth);
+        const descLines = wrap(doc, v.description, contentWidth);
         descLines.forEach((line: string) => {
-          y = checkPageBreak(doc, y, 13, margin);
+          y = pageBreak(doc, y, LINE_SM, margin);
           doc.text(line, margin, y);
-          y += 13;
+          y += LINE_SM;
         });
-        y += 4;
+        y += 8;
 
-        // Location
+        // Detail rows (Location, Recommendation, Regulatory Ref)
+        const detailIndent = margin + 2;
+
         if (v.location) {
-          y = checkPageBreak(doc, y, 16, margin);
+          y = pageBreak(doc, y, LINE_SM + 4, margin);
           doc.setFont("helvetica", "bold");
           doc.setFontSize(9);
           doc.setTextColor(...COLOR_DARK);
-          doc.text("Location: ", margin, y);
+          doc.text("Location", detailIndent, y);
           doc.setFont("helvetica", "normal");
-          doc.setTextColor(...COLOR_MUTED);
-          doc.text(v.location, margin + doc.getTextWidth("Location: "), y);
-          y += 14;
-        }
-
-        // Recommendation
-        if (v.recommendation) {
-          y = checkPageBreak(doc, y, 16, margin);
-          doc.setFont("helvetica", "bold");
           doc.setFontSize(9);
-          doc.setTextColor(...COLOR_DARK);
-          doc.text("Recommendation: ", margin, y);
-          y += 13;
-          doc.setFont("helvetica", "normal");
           doc.setTextColor(...COLOR_MUTED);
-          const recLines = wrapText(doc, v.recommendation, contentWidth);
-          recLines.forEach((line: string) => {
-            y = checkPageBreak(doc, y, 13, margin);
-            doc.text(line, margin, y);
-            y += 13;
+          const locLines = wrap(doc, v.location, contentWidth - 70);
+          locLines.forEach((line: string, li: number) => {
+            if (li === 0) {
+              doc.text(line, detailIndent + 62, y);
+            } else {
+              y += LINE_SM;
+              y = pageBreak(doc, y, LINE_SM, margin);
+              doc.text(line, detailIndent + 62, y);
+            }
           });
-          y += 4;
+          y += LINE_SM + 4;
         }
 
-        // Regulatory reference
-        if (v.regulatory_reference) {
-          y = checkPageBreak(doc, y, 16, margin);
+        if (v.recommendation) {
+          y = pageBreak(doc, y, LINE_SM + 4, margin);
           doc.setFont("helvetica", "bold");
           doc.setFontSize(9);
           doc.setTextColor(...BRAND_ACCENT);
-          doc.text("Regulatory Ref: ", margin, y);
+          doc.text("Fix", detailIndent, y);
           doc.setFont("helvetica", "normal");
-          const refLines = wrapText(doc, v.regulatory_reference, contentWidth - doc.getTextWidth("Regulatory Ref: "));
-          refLines.forEach((line: string, li: number) => {
+          doc.setFontSize(9);
+          doc.setTextColor(...COLOR_DARK);
+          const recLines = wrap(doc, v.recommendation, contentWidth - 70);
+          recLines.forEach((line: string, li: number) => {
             if (li === 0) {
-              doc.text(line, margin + doc.getTextWidth("Regulatory Ref: "), y);
+              doc.text(line, detailIndent + 62, y);
             } else {
-              y += 13;
-              y = checkPageBreak(doc, y, 13, margin);
-              doc.text(line, margin, y);
+              y += LINE_SM;
+              y = pageBreak(doc, y, LINE_SM, margin);
+              doc.text(line, detailIndent + 62, y);
             }
           });
-          y += 14;
+          y += LINE_SM + 4;
         }
 
-        // Divider between violations
-        y += 4;
-        y = checkPageBreak(doc, y, 8, margin);
-        doc.setDrawColor(230, 230, 235);
-        doc.setLineWidth(0.5);
-        doc.line(margin, y, pageWidth - margin, y);
-        y += 12;
+        if (v.regulatory_reference) {
+          y = pageBreak(doc, y, LINE_SM + 4, margin);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9);
+          doc.setTextColor(...BRAND_ACCENT2);
+          doc.text("Regulation", detailIndent, y);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(...COLOR_MUTED);
+          const refLines = wrap(doc, v.regulatory_reference, contentWidth - 70);
+          refLines.forEach((line: string, li: number) => {
+            if (li === 0) {
+              doc.text(line, detailIndent + 62, y);
+            } else {
+              y += LINE_SM;
+              y = pageBreak(doc, y, LINE_SM, margin);
+              doc.text(line, detailIndent + 62, y);
+            }
+          });
+          y += LINE_SM + 2;
+        }
+
+        // Divider (skip after last item)
+        if (vi < result.violations.length - 1) {
+          y += 4;
+          y = pageBreak(doc, y, 10, margin);
+          doc.setDrawColor(...COLOR_CARD_BORDER);
+          doc.setLineWidth(0.5);
+          doc.line(margin, y, pageWidth - margin, y);
+          y += 16;
+        } else {
+          y += 8;
+        }
       });
+
+      y += SECTION_GAP - 8;
     }
 
-    // ── Compliant Areas ─────────────────────────────────────
+    // =============================================================
+    //  COMPLIANT AREAS
+    // =============================================================
     if (result.compliant_areas.length > 0) {
-      y = checkPageBreak(doc, y, 30, margin);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.setTextColor(...COLOR_SUCCESS);
-      doc.text("Compliant Areas", margin, y);
-      y += 18;
+      y = pageBreak(doc, y, 60, margin);
+      y = drawSectionHeading(doc, "Compliant Areas", margin, y, COLOR_SUCCESS);
 
       result.compliant_areas.forEach((area) => {
-        y = checkPageBreak(doc, y, 18, margin);
+        y = pageBreak(doc, y, 22, margin);
 
         // Green checkmark circle
         doc.setFillColor(...COLOR_SUCCESS);
-        doc.circle(margin + 6, y - 3, 6, "F");
+        doc.circle(margin + 8, y - 3, 7, "F");
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
+        doc.setFontSize(10);
         doc.setTextColor(255, 255, 255);
-        doc.text("\u2713", margin + 6, y, { align: "center" });
+        doc.text("\u2713", margin + 8, y + 1, { align: "center" });
 
         // Area text
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
+        doc.setFontSize(10.5);
         doc.setTextColor(...COLOR_DARK);
-        const areaLines = wrapText(doc, area, contentWidth - 22);
+        const areaLines = wrap(doc, area, contentWidth - 30);
         areaLines.forEach((line: string, li: number) => {
-          if (li > 0) y = checkPageBreak(doc, y, 14, margin);
-          doc.text(line, margin + 18, y);
-          y += 14;
+          if (li > 0) {
+            y += LINE_MD;
+            y = pageBreak(doc, y, LINE_MD, margin);
+          }
+          doc.text(line, margin + 24, y);
         });
-        y += 2;
+        y += LINE_MD + 4;
       });
     }
 
-    // ── Footer ──────────────────────────────────────────────
+    // =============================================================
+    //  FOOTER (all pages)
+    // =============================================================
     const pageCount = doc.getNumberOfPages();
     const footerDate = new Date().toLocaleDateString("en-US", {
       month: "long",
@@ -427,27 +532,33 @@ export async function GET(
     for (let p = 1; p <= pageCount; p++) {
       doc.setPage(p);
       const pageH = doc.internal.pageSize.getHeight();
+
+      // Gradient accent line
       doc.setDrawColor(...BRAND_ACCENT);
       doc.setLineWidth(1);
-      doc.line(margin, pageH - 36, pageWidth - margin, pageH - 36);
+      doc.line(margin, pageH - 40, margin + contentWidth * 0.6, pageH - 40);
+      doc.setDrawColor(...BRAND_ACCENT2);
+      doc.line(margin + contentWidth * 0.6, pageH - 40, pageWidth - margin, pageH - 40);
 
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setTextColor(...COLOR_MUTED);
       doc.text(
-        `Generated by Viotraix — AI Workplace Safety Audits  |  ${footerDate}`,
+        `Generated by Viotraix  \u2014  AI Workplace Safety Audits  |  ${footerDate}`,
         margin,
-        pageH - 22
+        pageH - 24,
       );
       doc.text(
         `Page ${p} of ${pageCount}`,
         pageWidth - margin,
-        pageH - 22,
-        { align: "right" }
+        pageH - 24,
+        { align: "right" },
       );
     }
 
-    // ── Return PDF ──────────────────────────────────────────
+    // =============================================================
+    //  RETURN PDF
+    // =============================================================
     const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
     const safeName = a.file_name.replace(/[^a-zA-Z0-9._-]/g, "_");
 
