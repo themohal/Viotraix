@@ -232,7 +232,7 @@ export async function GET(
     const stw = doc.getTextWidth(scoreText);
     const badgeW = stw + 28;
     const badgeH = 36;
-    const infoCardH = 82;
+    const infoCardH = 88;
 
     drawCard(doc, margin, y, contentWidth, infoCardH, COLOR_LIGHT_BG, COLOR_CARD_BORDER);
 
@@ -258,25 +258,31 @@ export async function GET(
     const infoX = margin + INNER_PAD + 2;
     let infoY = y + INNER_PAD + 12;
 
-    // Row 1: labels
+    // Row 1: file
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(...COLOR_MUTED);
     doc.text("FILE", infoX, infoY);
-    doc.text("INDUSTRY", infoX + 160, infoY);
-    infoY += 14;
-
-    // Row 2: values
+    const displayName = a.file_name.length > 30 ? a.file_name.slice(0, 28) + "..." : a.file_name;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(...COLOR_DARK);
-    const displayName = a.file_name.length > 22 ? a.file_name.slice(0, 20) + "..." : a.file_name;
-    doc.text(displayName, infoX, infoY);
-    const industry = result.industry_detected || a.industry_type;
-    doc.text(industry.charAt(0).toUpperCase() + industry.slice(1), infoX + 160, infoY);
-    infoY += 18;
+    doc.text(displayName, infoX + 70, infoY);
+    infoY += 16;
 
-    // Row 3: date (full width under the labels)
+    // Row 2: industry
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...COLOR_MUTED);
+    doc.text("INDUSTRY", infoX, infoY);
+    const industry = result.industry_detected || a.industry_type;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...COLOR_DARK);
+    doc.text(industry.charAt(0).toUpperCase() + industry.slice(1), infoX + 70, infoY);
+    infoY += 16;
+
+    // Row 3: date
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(...COLOR_MUTED);
@@ -284,7 +290,7 @@ export async function GET(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(...COLOR_DARK);
-    doc.text(date, infoX + 42, infoY);
+    doc.text(date, infoX + 70, infoY);
 
     y += infoCardH + SECTION_GAP;
 
