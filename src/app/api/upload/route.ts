@@ -51,35 +51,17 @@ export async function POST(request: Request) {
 
     const supabase = getServiceSupabase();
 
-    // Upload to Supabase Storage
-    const fileExt = file.name.split(".").pop() || "jpg";
-    const fileName = `${auth.user.id}/${Date.now()}.${fileExt}`;
+    // Convert image to base64 data URL for in-memory processing (no storage)
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+    const dataUrl = `data:${file.type};base64,${base64}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("audit-images")
-      .upload(fileName, file, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      return NextResponse.json(
-        { error: "Failed to upload image" },
-        { status: 500 }
-      );
-    }
-
-    // Get the public URL (or signed URL for private bucket)
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("audit-images").getPublicUrl(fileName);
-
-    // Create audit record
+    // Create audit record with base64 image (cleared after analysis)
     const { data: audit, error: insertError } = await supabase
       .from("audits")
       .insert({
         user_id: auth.user.id,
-        image_url: publicUrl,
+        image_url: dataUrl,
         file_name: file.name,
         industry_type: industry,
         status: "pending",
@@ -95,7 +77,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ auditId: audit.id, imageUrl: publicUrl });
+    return NextResponse.json({ auditId: audit.id });
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

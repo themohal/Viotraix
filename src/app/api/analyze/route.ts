@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       // Run analysis
       const result = await analyzeImage(audit.image_url, audit.industry_type);
 
-      // Update audit with results
+      // Update audit with results and discard the image data
       await supabase
         .from("audits")
         .update({
@@ -53,6 +53,7 @@ export async function POST(request: Request) {
           overall_score: result.overall_score,
           violations_count: result.violations.length,
           result_json: result,
+          image_url: null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", auditId);
@@ -69,6 +70,7 @@ export async function POST(request: Request) {
         .update({
           status: "failed",
           processing_error: "Something went wrong while analyzing your image. Please try again.",
+          image_url: null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", auditId);
