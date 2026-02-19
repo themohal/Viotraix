@@ -28,6 +28,8 @@ interface AuditResult {
 interface Audit {
   id: string;
   file_name: string;
+  audit_name: string | null;
+  image_count: number;
   industry_type: string;
   status: string;
   overall_score: number | null;
@@ -131,7 +133,7 @@ export default function AuditDetailPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `viotraix-audit-${audit.file_name.replace(/[^a-zA-Z0-9._-]/g, "_")}.pdf`;
+      a.download = `viotraix-audit-${(audit.audit_name || audit.file_name).replace(/[^a-zA-Z0-9._-]/g, "_")}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -173,8 +175,13 @@ export default function AuditDetailPage() {
         <div>
           <h1 className="text-2xl font-bold">Audit Report</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {audit.file_name} &middot; {date}
+            {audit.audit_name || audit.file_name} &middot; {date}
           </p>
+          {audit.image_count > 1 && (
+            <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">
+              {audit.image_count} photos analyzed
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {audit.status === "completed" && audit.overall_score !== null && (

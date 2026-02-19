@@ -29,6 +29,8 @@ create table if not exists public.audits (
   user_id uuid not null references public.profiles(id) on delete cascade,
   image_url text,
   file_name text,
+  audit_name text,
+  image_count integer not null default 1,
   industry_type text default 'general',
   status text not null default 'pending',
   overall_score integer,

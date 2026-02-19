@@ -8,6 +8,8 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 interface Audit {
   id: string;
   file_name: string;
+  audit_name: string | null;
+  image_count: number;
   industry_type: string;
   status: string;
   overall_score: number | null;
@@ -119,6 +121,8 @@ export default function AuditsPage() {
               key={audit.id}
               id={audit.id}
               fileName={audit.file_name}
+              auditName={audit.audit_name}
+              imageCount={audit.image_count}
               industryType={audit.industry_type}
               status={audit.status}
               overallScore={audit.overall_score}

@@ -4,6 +4,8 @@ import ScoreBadge from "./ScoreBadge";
 interface AuditCardProps {
   id: string;
   fileName: string;
+  auditName?: string | null;
+  imageCount?: number;
   industryType: string;
   status: string;
   overallScore: number | null;
@@ -15,6 +17,8 @@ interface AuditCardProps {
 export default function AuditCard({
   id,
   fileName,
+  auditName,
+  imageCount = 1,
   industryType,
   status,
   overallScore,
@@ -49,10 +53,15 @@ export default function AuditCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-semibold">{fileName || "Untitled"}</p>
+            <p className="truncate text-sm font-semibold">{auditName || fileName || "Untitled"}</p>
             <span className="shrink-0 rounded-lg bg-accent/5 border border-accent/10 px-2 py-0.5 text-xs text-accent capitalize">
               {industryType}
             </span>
+            {imageCount > 1 && (
+              <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
+                {imageCount} photos
+              </span>
+            )}
           </div>
           <div className="mt-1.5 flex items-center gap-3 text-xs text-muted">
             <span>{date}</span>

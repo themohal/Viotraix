@@ -48,6 +48,7 @@ const tiers = [
     audits: "200 audits/mo",
     features: [
       "Everything in Basic",
+      "Bulk upload (up to 10 images)",
       "Priority AI processing",
       "PDF export",
       "Analytics dashboard",

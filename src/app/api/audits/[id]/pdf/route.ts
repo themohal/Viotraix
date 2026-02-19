@@ -25,6 +25,8 @@ interface AuditRow {
   id: string;
   user_id: string;
   file_name: string;
+  audit_name: string | null;
+  image_count: number;
   industry_type: string;
   status: string;
   overall_score: number | null;
@@ -232,7 +234,12 @@ export async function GET(
     const stw = doc.getTextWidth(scoreText);
     const badgeW = stw + 28;
     const badgeH = 36;
-    const infoCardH = 88;
+
+    // Calculate info card rows
+    const hasAuditName = !!a.audit_name;
+    const hasMultipleImages = a.image_count > 1;
+    const infoRowCount = 3 + (hasMultipleImages ? 1 : 0); // file/project + industry + date + optional images
+    const infoCardH = INNER_PAD * 2 + 12 + infoRowCount * 16;
 
     drawCard(doc, margin, y, contentWidth, infoCardH, COLOR_LIGHT_BG, COLOR_CARD_BORDER);
 
@@ -258,19 +265,34 @@ export async function GET(
     const infoX = margin + INNER_PAD + 2;
     let infoY = y + INNER_PAD + 12;
 
-    // Row 1: file
+    // Row 1: project name or file name
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(...COLOR_MUTED);
-    doc.text("FILE", infoX, infoY);
-    const displayName = a.file_name.length > 30 ? a.file_name.slice(0, 28) + "..." : a.file_name;
+    const nameLabel = hasAuditName ? "PROJECT" : "FILE";
+    doc.text(nameLabel, infoX, infoY);
+    const rawName = hasAuditName ? a.audit_name! : a.file_name;
+    const displayName = rawName.length > 30 ? rawName.slice(0, 28) + "..." : rawName;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(...COLOR_DARK);
     doc.text(displayName, infoX + 70, infoY);
     infoY += 16;
 
-    // Row 2: industry
+    // Row 2 (optional): image count
+    if (hasMultipleImages) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...COLOR_MUTED);
+      doc.text("IMAGES", infoX, infoY);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(...COLOR_DARK);
+      doc.text(`${a.image_count} photos analyzed`, infoX + 70, infoY);
+      infoY += 16;
+    }
+
+    // Row: industry
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(...COLOR_MUTED);
@@ -282,7 +304,7 @@ export async function GET(
     doc.text(industry.charAt(0).toUpperCase() + industry.slice(1), infoX + 70, infoY);
     infoY += 16;
 
-    // Row 3: date
+    // Row: date
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(...COLOR_MUTED);
@@ -581,7 +603,8 @@ export async function GET(
     //  RETURN PDF
     // =============================================================
     const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
-    const safeName = a.file_name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const rawFileName = a.audit_name || a.file_name;
+    const safeName = rawFileName.replace(/[^a-zA-Z0-9._-]/g, "_");
 
     return new NextResponse(pdfBuffer, {
       status: 200,

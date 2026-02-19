@@ -27,7 +27,7 @@ Return ONLY a valid JSON object (no markdown, no code fences) with this exact st
 
 Be thorough but accurate. Only report violations you can actually see evidence of in the image. Score higher if the space looks generally safe, lower if there are serious hazards.`;
 
-export async function analyzeImage(imageUrl: string, industryHint?: string): Promise<{
+export async function analyzeImage(imageUrl: string | string[], industryHint?: string): Promise<{
   overall_score: number;
   summary: string;
   industry_detected: string;
@@ -44,9 +44,22 @@ export async function analyzeImage(imageUrl: string, industryHint?: string): Pro
   compliant_areas: string[];
   priority_fixes: string[];
 }> {
+  const urls = Array.isArray(imageUrl) ? imageUrl : [imageUrl];
+  const isBulk = urls.length > 1;
+
   const industryContext = industryHint && industryHint !== "general"
     ? `\n\nThe user indicated this is a ${industryHint} environment. Pay special attention to industry-specific regulations.`
     : "";
+
+  const bulkContext = isBulk
+    ? `\n\nYou are analyzing ${urls.length} workplace photos from the same location. Provide a single combined report covering all images.`
+    : "";
+
+  const imageEntries: Array<{ type: "image_url"; image_url: { url: string; detail: "high" } }> =
+    urls.map((url) => ({
+      type: "image_url" as const,
+      image_url: { url, detail: "high" as const },
+    }));
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -56,12 +69,9 @@ export async function analyzeImage(imageUrl: string, industryHint?: string): Pro
         content: [
           {
             type: "text",
-            text: ANALYSIS_PROMPT + industryContext,
+            text: ANALYSIS_PROMPT + industryContext + bulkContext,
           },
-          {
-            type: "image_url",
-            image_url: { url: imageUrl, detail: "high" },
-          },
+          ...imageEntries,
         ],
       },
     ],

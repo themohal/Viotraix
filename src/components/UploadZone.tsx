@@ -7,8 +7,19 @@ import LoadingSpinner from "./LoadingSpinner";
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_BULK_FILES = 10;
 
-export default function UploadZone() {
+interface UploadZoneProps {
+  plan?: string;
+  remainingAudits?: number;
+}
+
+interface StagedFile {
+  file: File;
+  preview: string;
+}
+
+export default function UploadZone({ plan = "none", remainingAudits }: UploadZoneProps) {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -22,97 +33,192 @@ export default function UploadZone() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  // Clean up camera stream on unmount
+  // Pro bulk upload state
+  const isPro = plan === "pro";
+  const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
+  const [auditName, setAuditName] = useState("");
+
+  // Clean up camera stream and object URLs on unmount
   useEffect(() => {
     return () => {
       stopCamera();
+      stagedFiles.forEach((sf) => URL.revokeObjectURL(sf.preview));
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const validateFile = (file: File): string | null => {
+    if (file.name.length > 50) return "File name must be 50 characters or less.";
+    if (!ACCEPTED_TYPES.includes(file.type)) return "Please upload a JPG, PNG, or WebP image.";
+    if (file.size > MAX_SIZE) return "File size must be under 10MB.";
+    return null;
+  };
+
+  const uploadAndAnalyze = async (files: File[], name?: string) => {
+    setUploading(true);
+    setError("");
+
+    try {
+      const supabase = getSupabaseBrowser();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        setError("Please log in to upload.");
+        return;
+      }
+
+      const formData = new FormData();
+      if (files.length === 1) {
+        formData.append("file", files[0]);
+      } else {
+        files.forEach((f) => formData.append("files", f));
+      }
+      formData.append("industry", industry);
+      if (name) {
+        formData.append("audit_name", name);
+      }
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Upload failed");
+        return;
+      }
+
+      // Trigger analysis
+      await fetch("/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ auditId: data.auditId }),
+      });
+
+      router.push(`/audits/${data.auditId}`);
+    } catch {
+      setError("Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Single file flow (non-Pro or single file from Pro)
   const processFile = useCallback(
     async (file: File) => {
       setError("");
-
-      if (file.name.length > 50) {
-        setError("File name must be 50 characters or less. Please rename your file.");
+      const err = validateFile(file);
+      if (err) {
+        setError(err);
         return;
       }
 
-      if (!ACCEPTED_TYPES.includes(file.type)) {
-        setError("Please upload a JPG, PNG, or WebP image.");
+      if (isPro) {
+        // Stage the file instead of uploading immediately
+        addFilesToStaging([file]);
         return;
       }
 
-      if (file.size > MAX_SIZE) {
-        setError("File size must be under 10MB.");
-        return;
-      }
-
-      setUploading(true);
-
-      try {
-        const supabase = getSupabaseBrowser();
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session) {
-          setError("Please log in to upload.");
-          return;
-        }
-
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("industry", industry);
-
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: formData,
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          setError(data.error || "Upload failed");
-          return;
-        }
-
-        // Trigger analysis
-        await fetch("/api/analyze", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ auditId: data.auditId }),
-        });
-
-        router.push(`/audits/${data.auditId}`);
-      } catch {
-        setError("Upload failed. Please try again.");
-      } finally {
-        setUploading(false);
-      }
+      await uploadAndAnalyze([file]);
     },
-    [industry, router]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [industry, router, isPro]
   );
+
+  const addFilesToStaging = (newFiles: File[]) => {
+    setError("");
+    const currentCount = stagedFiles.length;
+    const available = MAX_BULK_FILES - currentCount;
+
+    if (available <= 0) {
+      setError(`Maximum ${MAX_BULK_FILES} images per bulk upload.`);
+      return;
+    }
+
+    const filesToAdd = newFiles.slice(0, available);
+    if (newFiles.length > available) {
+      setError(`Only ${available} more image${available === 1 ? "" : "s"} can be added (max ${MAX_BULK_FILES}).`);
+    }
+
+    for (const file of filesToAdd) {
+      const err = validateFile(file);
+      if (err) {
+        setError(`${file.name}: ${err}`);
+        return;
+      }
+    }
+
+    const staged = filesToAdd.map((file) => ({
+      file,
+      preview: URL.createObjectURL(file),
+    }));
+
+    setStagedFiles((prev) => [...prev, ...staged]);
+  };
+
+  const removeStagedFile = (index: number) => {
+    setStagedFiles((prev) => {
+      const removed = prev[index];
+      if (removed) URL.revokeObjectURL(removed.preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const handleBulkUpload = async () => {
+    if (stagedFiles.length === 0) return;
+
+    if (stagedFiles.length > 1 && !auditName.trim()) {
+      setError("Please enter a project/audit name for bulk uploads.");
+      return;
+    }
+
+    const files = stagedFiles.map((sf) => sf.file);
+    const name = auditName.trim() || undefined;
+    await uploadAndAnalyze(files, name);
+
+    // Clean up previews
+    stagedFiles.forEach((sf) => URL.revokeObjectURL(sf.preview));
+    setStagedFiles([]);
+    setAuditName("");
+  };
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setDragOver(false);
-      const file = e.dataTransfer.files[0];
-      if (file) processFile(file);
+      const droppedFiles = Array.from(e.dataTransfer.files);
+
+      if (isPro) {
+        addFilesToStaging(droppedFiles);
+      } else {
+        const file = droppedFiles[0];
+        if (file) processFile(file);
+      }
     },
-    [processFile]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [processFile, isPro, stagedFiles]
   );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
+    const files = Array.from(e.target.files || []);
+    if (isPro) {
+      addFilesToStaging(files);
+    } else {
+      const file = files[0];
+      if (file) processFile(file);
+    }
+    // Reset input so the same file can be selected again
+    e.target.value = "";
   };
 
   const stopCamera = () => {
@@ -240,6 +346,12 @@ export default function UploadZone() {
     if (file) processFile(file);
   };
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -260,6 +372,30 @@ export default function UploadZone() {
           <option value="office">Office</option>
         </select>
       </div>
+
+      {/* Pro: Audit Name input */}
+      {isPro && (
+        <div>
+          <label htmlFor="audit-name" className="mb-1.5 block text-sm font-medium">
+            Project / Audit Name
+            {stagedFiles.length > 1 && <span className="ml-1 text-xs text-danger">*</span>}
+          </label>
+          <input
+            id="audit-name"
+            type="text"
+            value={auditName}
+            onChange={(e) => setAuditName(e.target.value)}
+            placeholder="e.g. Kitchen Safety Inspection — Feb 2026"
+            maxLength={100}
+            className="input-field max-w-md"
+          />
+          {stagedFiles.length <= 1 && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Optional for single uploads, required for bulk uploads
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Hidden camera input for mobile fallback */}
       <input
@@ -330,8 +466,76 @@ export default function UploadZone() {
         </div>
       )}
 
+      {/* Pro: Staged files preview */}
+      {isPro && stagedFiles.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">
+              {stagedFiles.length} image{stagedFiles.length !== 1 ? "s" : ""} staged
+              <span className="ml-1 text-muted-foreground">({MAX_BULK_FILES} max)</span>
+            </p>
+            <button
+              onClick={() => {
+                stagedFiles.forEach((sf) => URL.revokeObjectURL(sf.preview));
+                setStagedFiles([]);
+              }}
+              className="text-xs text-muted-foreground hover:text-danger transition"
+            >
+              Clear all
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+            {stagedFiles.map((sf, i) => (
+              <div key={i} className="group/thumb relative rounded-xl border border-border/60 bg-card/50 overflow-hidden">
+                <img
+                  src={sf.preview}
+                  alt={sf.file.name}
+                  className="aspect-square w-full object-cover"
+                />
+                <div className="p-2">
+                  <p className="truncate text-xs font-medium">{sf.file.name}</p>
+                  <p className="text-xs text-muted-foreground">{formatFileSize(sf.file.size)}</p>
+                </div>
+                <button
+                  onClick={() => removeStagedFile(i)}
+                  className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition group-hover/thumb:opacity-100 hover:bg-danger"
+                  title="Remove"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Start Audit button */}
+          <button
+            onClick={handleBulkUpload}
+            disabled={uploading}
+            className="btn-primary flex w-full items-center justify-center gap-2 py-3 text-sm"
+          >
+            {uploading ? (
+              <>
+                <LoadingSpinner size="sm" />
+                Analyzing {stagedFiles.length} image{stagedFiles.length !== 1 ? "s" : ""}...
+              </>
+            ) : (
+              <>
+                Start Audit
+                {stagedFiles.length > 1 && (
+                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">
+                    {stagedFiles.length} images
+                  </span>
+                )}
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Upload / Drag Drop Zone */}
-      {!cameraActive && (
+      {!cameraActive && !uploading && (
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -373,19 +577,21 @@ export default function UploadZone() {
                 </svg>
               </div>
               <p className="text-base font-semibold">
-                Drag & drop a workplace photo
+                {isPro ? "Drag & drop workplace photos" : "Drag & drop a workplace photo"}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 JPG, PNG, or WebP up to 10MB
+                {isPro && " each — up to 10 images"}
               </p>
 
               <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
                 {/* Choose File button */}
                 <label className="btn-primary cursor-pointer text-sm">
-                  Choose File
+                  {isPro ? "Choose Files" : "Choose File"}
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
+                    multiple={isPro}
                     onChange={handleChange}
                     className="hidden"
                   />
@@ -421,6 +627,19 @@ export default function UploadZone() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Uploading overlay (when not in drop zone) */}
+      {uploading && !cameraActive && stagedFiles.length === 0 && (
+        <div className="flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed border-accent/30 p-14 text-center">
+          <LoadingSpinner size="lg" />
+          <div>
+            <p className="font-medium">Analyzing your workspace...</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              This usually takes 30-60 seconds
+            </p>
+          </div>
         </div>
       )}
 

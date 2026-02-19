@@ -25,44 +25,74 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
-    const file = formData.get("file") as File | null;
+    const files = formData.getAll("files") as File[];
+    const singleFile = formData.get("file") as File | null;
     const industry = (formData.get("industry") as string) || "general";
+    const auditName = (formData.get("audit_name") as string) || null;
 
-    if (!file) {
+    // Support both "file" (single, backward compat) and "files" (bulk)
+    const allFiles = files.length > 0 ? files : singleFile ? [singleFile] : [];
+
+    if (allFiles.length === 0) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Validate file type
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
+    // Only Pro users can upload multiple files
+    if (allFiles.length > 1 && usage.plan !== "pro") {
       return NextResponse.json(
-        { error: "Invalid file type. Please upload JPG, PNG, or WebP." },
+        { error: "Bulk upload is only available on the Pro plan." },
+        { status: 403 }
+      );
+    }
+
+    // Max 10 files per bulk upload
+    if (allFiles.length > 10) {
+      return NextResponse.json(
+        { error: "Maximum 10 images per bulk upload." },
         { status: 400 }
       );
     }
 
-    // Validate file size (10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: "File too large. Maximum size is 10MB." },
-        { status: 400 }
-      );
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    // Validate all files
+    for (const file of allFiles) {
+      if (!allowedTypes.includes(file.type)) {
+        return NextResponse.json(
+          { error: `Invalid file type: ${file.name}. Please upload JPG, PNG, or WebP.` },
+          { status: 400 }
+        );
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        return NextResponse.json(
+          { error: `File too large: ${file.name}. Maximum size is 10MB.` },
+          { status: 400 }
+        );
+      }
     }
 
     const supabase = getServiceSupabase();
 
-    // Convert image to base64 data URL for in-memory processing (no storage)
-    const arrayBuffer = await file.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
-    const dataUrl = `data:${file.type};base64,${base64}`;
+    // Convert all images to base64 data URLs
+    const dataUrls: string[] = [];
+    for (const file of allFiles) {
+      const arrayBuffer = await file.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString("base64");
+      dataUrls.push(`data:${file.type};base64,${base64}`);
+    }
 
-    // Create audit record with base64 image (cleared after analysis)
+    const isBulk = allFiles.length > 1;
+    const imageUrl = isBulk ? JSON.stringify(dataUrls) : dataUrls[0];
+
+    // Create audit record
     const { data: audit, error: insertError } = await supabase
       .from("audits")
       .insert({
         user_id: auth.user.id,
-        image_url: dataUrl,
-        file_name: file.name,
+        image_url: imageUrl,
+        file_name: allFiles[0].name,
+        audit_name: auditName,
+        image_count: allFiles.length,
         industry_type: industry,
         status: "pending",
         pdf_eligible: usage.plan === "pro",

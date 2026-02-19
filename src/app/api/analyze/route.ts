@@ -42,8 +42,18 @@ export async function POST(request: Request) {
       .eq("id", auditId);
 
     try {
+      // Detect bulk upload (image_url is a JSON array string)
+      let imageInput: string | string[] = audit.image_url;
+      if (audit.image_url.startsWith("[")) {
+        try {
+          imageInput = JSON.parse(audit.image_url) as string[];
+        } catch {
+          // Not valid JSON array, treat as single URL
+        }
+      }
+
       // Run analysis
-      const result = await analyzeImage(audit.image_url, audit.industry_type);
+      const result = await analyzeImage(imageInput, audit.industry_type);
 
       // Update audit with results and discard the image data
       await supabase

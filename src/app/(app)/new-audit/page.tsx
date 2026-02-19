@@ -126,7 +126,7 @@ export default function NewAuditPage() {
       {/* Upload Zone */}
       {usage && usage.canAudit ? (
         <div className="rounded-2xl border border-border/60 bg-card/50 p-5 backdrop-blur-sm">
-          <UploadZone />
+          <UploadZone plan={usage.plan} remainingAudits={usage.auditsLimit - usage.auditsUsed} />
         </div>
       ) : usage && !usage.canAudit && usage.plan !== "none" && usage.plan !== "expired" ? (
         <div className="rounded-2xl border border-danger/30 bg-danger/5 p-5 backdrop-blur-sm">
