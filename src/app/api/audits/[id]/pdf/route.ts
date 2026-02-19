@@ -224,52 +224,67 @@ export async function GET(
 
     const score = result.overall_score;
     const scoreColor = getScoreColor(score);
-    const infoCardH = 82;
 
-    drawCard(doc, margin, y, contentWidth, infoCardH, COLOR_LIGHT_BG, COLOR_CARD_BORDER);
-
-    // Left side — meta info
-    const infoX = margin + INNER_PAD + 2;
-    let infoY = y + INNER_PAD + 12;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(...COLOR_MUTED);
-    doc.text("FILE", infoX, infoY);
-    doc.text("INDUSTRY", infoX + 190, infoY);
-    doc.text("DATE", infoX + 340, infoY);
-    infoY += 14;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(...COLOR_DARK);
-    // Truncate file name if too long
-    const displayName = a.file_name.length > 26 ? a.file_name.slice(0, 24) + "..." : a.file_name;
-    doc.text(displayName, infoX, infoY);
-    const industry = result.industry_detected || a.industry_type;
-    doc.text(industry.charAt(0).toUpperCase() + industry.slice(1), infoX + 190, infoY);
-    doc.text(date, infoX + 340, infoY);
-
-    // Score badge (right-aligned inside card)
+    // Measure score badge first so we know how much right-side space it needs
     const scoreText = `${score} / 100`;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(20);
     const stw = doc.getTextWidth(scoreText);
     const badgeW = stw + 28;
+    const badgeH = 36;
+    const infoCardH = 82;
+
+    drawCard(doc, margin, y, contentWidth, infoCardH, COLOR_LIGHT_BG, COLOR_CARD_BORDER);
+
+    // Right side — score badge (vertically centered in card)
     const badgeX = margin + contentWidth - INNER_PAD - badgeW;
-    const badgeY = y + infoCardH - INNER_PAD - 30;
+    const badgeY = y + (infoCardH - badgeH) / 2;
 
     // Glow
     doc.setFillColor(...scoreColor);
     doc.setGState(doc.GState({ opacity: 0.15 }));
-    doc.roundedRect(badgeX - 4, badgeY - 4, badgeW + 8, 34 + 8, 10, 10, "F");
+    doc.roundedRect(badgeX - 4, badgeY - 4, badgeW + 8, badgeH + 8, 10, 10, "F");
     doc.setGState(doc.GState({ opacity: 1 }));
 
     // Badge
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
     doc.setFillColor(...scoreColor);
-    doc.roundedRect(badgeX, badgeY, badgeW, 34, 6, 6, "F");
+    doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 6, 6, "F");
     doc.setTextColor(255, 255, 255);
-    doc.text(scoreText, badgeX + 14, badgeY + 24);
+    doc.text(scoreText, badgeX + 14, badgeY + 25);
+
+    // Left side — meta info (constrained so it doesn't overlap badge)
+    const infoX = margin + INNER_PAD + 2;
+    let infoY = y + INNER_PAD + 12;
+
+    // Row 1: labels
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...COLOR_MUTED);
+    doc.text("FILE", infoX, infoY);
+    doc.text("INDUSTRY", infoX + 160, infoY);
+    infoY += 14;
+
+    // Row 2: values
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...COLOR_DARK);
+    const displayName = a.file_name.length > 22 ? a.file_name.slice(0, 20) + "..." : a.file_name;
+    doc.text(displayName, infoX, infoY);
+    const industry = result.industry_detected || a.industry_type;
+    doc.text(industry.charAt(0).toUpperCase() + industry.slice(1), infoX + 160, infoY);
+    infoY += 18;
+
+    // Row 3: date (full width under the labels)
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...COLOR_MUTED);
+    doc.text("DATE", infoX, infoY);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...COLOR_DARK);
+    doc.text(date, infoX + 42, infoY);
 
     y += infoCardH + SECTION_GAP;
 
