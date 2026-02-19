@@ -33,6 +33,11 @@ export default function UploadZone() {
     async (file: File) => {
       setError("");
 
+      if (file.name.length > 50) {
+        setError("File name must be 50 characters or less. Please rename your file.");
+        return;
+      }
+
       if (!ACCEPTED_TYPES.includes(file.type)) {
         setError("Please upload a JPG, PNG, or WebP image.");
         return;
